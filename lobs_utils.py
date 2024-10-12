@@ -12,6 +12,7 @@ class LobsDnnModel(nn.Module):
         self.hessians = []
         self.hpinvs = []
         self.sampleCount = 0
+        self.gama=0.0
 
     def resetHessianStats(self):
         for i in range(0, len(self.hessians)):
@@ -48,6 +49,7 @@ def updateHessianStats(model, inputs):
 
 # 计算各个subblock的hessian和伪逆阵
 def calcHessiansAndPinvs(model, gama):
+    model.gama = gama
     print("Sample count:", model.sampleCount)
     for i, (name, layer) in enumerate(model.named_children()):
         if model.hessians[i] is None:
@@ -108,7 +110,7 @@ def optimal_brain_surgeon(layer, indices, h_block, hpinv_block):
     flat_weight += delta_w
     return flat_weight.squeeze(1).view(layer.out_features, layer.in_features), loss[0][0].item(), original_delta
 
-def optimal_brain_surgeon_v2(layer, indices, h_block):
+def optimal_brain_surgeon_v2(layer, indices, h_block, gama):
     flat_weight = layer.weight.flatten()
     accum_factor_vector = torch.zeros(layer.in_features * layer.out_features, dtype=torch.float)
     mask = torch.zeros(layer.in_features * layer.out_features, dtype=torch.bool)
@@ -162,6 +164,7 @@ def optimal_brain_surgeon_v2(layer, indices, h_block):
     print("Delta:", delta)
     flat_weight = flat_weight.unsqueeze(1)
     print("FlatWeight:", flat_weight)
+    g = 2 * gama * flat_weight
     flat_weight += delta
-    loss = torch.mm(torch.transpose(delta, 0, 1), custom_kernels.hessianorpinv_matmul_vector(h_block, delta, layer.out_features)) / 2.0
+    loss = torch.mm(g.t(), delta) + torch.mm(torch.transpose(delta, 0, 1), custom_kernels.hessianorpinv_matmul_vector(h_block, delta, layer.out_features)) / 2.0
     return flat_weight.squeeze(1).view(layer.out_features, layer.in_features), loss[0][0].item(), delta
