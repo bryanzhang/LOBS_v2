@@ -100,7 +100,9 @@ for i, (images, labels) in enumerate(train_loader):
 
 model.eval()
 h_pinvs = []
-gama = 10000
+#gama = 0.000001
+#gama = 0.0
+gama = 1e-5
 lobs_utils.calcHessiansAndPinvs(model, gama)
 end_time = time.time()
 print("Generating hessian matrix and its pseudo-inverse done, ", end_time - start_time, " seconds elapsed.")
@@ -145,7 +147,7 @@ for i, (name, layer) in enumerate(layers):
             start_time = time.time()
             assert(indices.size(0) == count)
             hpinv = model.hpinvs[i]
-            weight, loss, original_delta = lobs_utils.optimal_brain_surgeon_v2(layer, indices, h)
+            weight, loss, original_delta = lobs_utils.optimal_brain_surgeon_v2(layer, indices, h, model.gama)
             #print("Sample weight after prune 3:", original_weight[(375129 // layer.in_features)][(375129 % layer.in_features)])
             end_time = time.time()
             layer.weight.data = weight

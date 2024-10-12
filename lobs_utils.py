@@ -112,12 +112,14 @@ def optimal_brain_surgeon(layer, indices, h_block, hpinv_block):
 
 def optimal_brain_surgeon_v2(layer, indices, h_block, gama):
     flat_weight = layer.weight.flatten()
+    g = 2 * gama * flat_weight.unsqueeze(1)
     accum_factor_vector = torch.zeros(layer.in_features * layer.out_features, dtype=torch.float)
     mask = torch.zeros(layer.in_features * layer.out_features, dtype=torch.bool)
     mask[indices] = True
     accum_factor_vector.scatter_(0, indices, flat_weight[mask])
     accum_factor_vector = accum_factor_vector.unsqueeze(1)
     original_beta = custom_kernels.hessianorpinv_matmul_vector(h_block, accum_factor_vector, layer.out_features)
+    original_beta -= g
     original_epsilon = original_beta
     row_mask = torch.ones(layer.in_features * layer.out_features, dtype=torch.bool)
     row_mask[indices] = False
@@ -164,7 +166,6 @@ def optimal_brain_surgeon_v2(layer, indices, h_block, gama):
     print("Delta:", delta)
     flat_weight = flat_weight.unsqueeze(1)
     print("FlatWeight:", flat_weight)
-    g = 2 * gama * flat_weight
     flat_weight += delta
-    loss = torch.mm(g.t(), delta) + torch.mm(torch.transpose(delta, 0, 1), custom_kernels.hessianorpinv_matmul_vector(h_block, delta, layer.out_features)) / 2.0
+    loss = torch.mm(g.transpose(0, 1), delta) + torch.mm(torch.transpose(delta, 0, 1), custom_kernels.hessianorpinv_matmul_vector(h_block, delta, layer.out_features)) / 2.0
     return flat_weight.squeeze(1).view(layer.out_features, layer.in_features), loss[0][0].item(), delta
